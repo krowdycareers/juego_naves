@@ -17,216 +17,6 @@ import json
 import argparse
 
 
-
-def dibujar_nave_roja(img, x, y, escala=1.0):
-    cx, cy = int(x), int(y)
-    body_w = max(46, int(72 * escala))
-    body_h = max(18, int(24 * escala))
-    dome_w = max(22, int(38 * escala))
-    dome_h = max(14, int(22 * escala))
-    blink_phase = time.time() * 8.0
-
-    # Halo inferior suave para dar efecto de nave
-    for i in range(3):
-        alpha_h = 0.17 - (i * 0.05)
-        halo = img.copy()
-        cv2.ellipse(
-            halo,
-            (cx, cy + int(10 * escala)),
-            (max(8, int((body_w * 0.38) + i * 6)), max(6, int((body_h * 0.35) + i * 5))),
-            0,
-            0,
-            360,
-            (0, 0, 120),
-            -1,
-            lineType=cv2.LINE_AA,
-        )
-        cv2.addWeighted(halo, max(0.0, alpha_h), img, 1.0 - max(0.0, alpha_h), 0, img)
-
-    # Cuerpo principal
-    cv2.ellipse(
-        img,
-        (cx, cy),
-        (body_w // 2, body_h // 2),
-        0,
-        0,
-        360,
-        (20, 20, 170),
-        -1,
-        lineType=cv2.LINE_AA,
-    )
-    cv2.ellipse(
-        img,
-        (cx, cy + int(2 * escala)),
-        (body_w // 2, max(5, int(body_h * 0.24))),
-        0,
-        0,
-        180,
-        (0, 0, 255),
-        2,
-        lineType=cv2.LINE_AA,
-    )
-
-    # Cúpula
-    cv2.ellipse(
-        img,
-        (cx, cy - int(body_h * 0.45)),
-        (dome_w // 2, dome_h // 2),
-        0,
-        180,
-        360,
-        (50, 80, 255),
-        -1,
-        lineType=cv2.LINE_AA,
-    )
-
-    # Ventanas
-    win_count = 5
-    for i in range(win_count):
-        wx = int(cx - body_w * 0.3 + i * (body_w * 0.15))
-        wy = int(cy - body_h * 0.12)
-        cv2.circle(img, (wx, wy), max(2, int(3 * escala)), (180, 220, 255), -1, lineType=cv2.LINE_AA)
-
-    # Luces del aro
-    light_count = 8
-    for i in range(light_count):
-        t = (2 * math.pi / light_count) * i
-        lx = int(cx + math.cos(t) * (body_w * 0.42))
-        ly = int(cy + math.sin(t) * (body_h * 0.20))
-        pulse = 0.45 + 0.55 * max(0.0, math.sin(blink_phase + i * 0.8))
-        light_color = (
-            int(120 + 110 * pulse),
-            int(120 + 110 * pulse),
-            int(200 + 55 * pulse),
-        )
-        if pulse > 0.8:
-            glow = img.copy()
-            cv2.circle(glow, (lx, ly), max(3, int(5 * escala)), light_color, -1, lineType=cv2.LINE_AA)
-            cv2.addWeighted(glow, 0.18, img, 0.82, 0, img)
-        cv2.circle(img, (lx, ly), max(1, int(2 * escala)), light_color, -1, lineType=cv2.LINE_AA)
-
-
-def dibujar_astronauta_azul(img, x, y, escala=1.0):
-    cx, cy = int(x), int(y)
-    suit_white = (245, 242, 238)
-    suit_shadow = (210, 205, 220)
-    visor_dark = (35, 18, 70)
-    visor_glow = (120, 80, 200)
-    blue = (235, 170, 60)
-    blue_dark = (200, 120, 35)
-    gold = (60, 180, 245)
-
-    # Sombra bajo el personaje para separarlo del fondo.
-    shadow = img.copy()
-    cv2.ellipse(
-        shadow,
-        (cx, cy + int(24 * escala)),
-        (max(10, int(22 * escala)), max(4, int(6 * escala))),
-        0,
-        0,
-        360,
-        (120, 110, 160),
-        -1,
-        lineType=cv2.LINE_AA,
-    )
-    cv2.addWeighted(shadow, 0.25, img, 0.75, 0, img)
-
-    # Mochila
-    cv2.rectangle(
-        img,
-        (cx + int(10 * escala), cy - int(2 * escala)),
-        (cx + int(20 * escala), cy + int(14 * escala)),
-        suit_shadow,
-        -1,
-    )
-
-    # Casco
-    cv2.circle(img, (cx, cy - int(10 * escala)), max(14, int(18 * escala)), suit_white, -1, lineType=cv2.LINE_AA)
-    cv2.ellipse(
-        img,
-        (cx - int(2 * escala), cy - int(10 * escala)),
-        (max(10, int(12 * escala)), max(12, int(14 * escala))),
-        -8,
-        0,
-        360,
-        visor_dark,
-        -1,
-        lineType=cv2.LINE_AA,
-    )
-    cv2.ellipse(
-        img,
-        (cx - int(7 * escala), cy - int(16 * escala)),
-        (max(2, int(3 * escala)), max(4, int(5 * escala))),
-        25,
-        0,
-        360,
-        visor_glow,
-        -1,
-        lineType=cv2.LINE_AA,
-    )
-    cv2.ellipse(
-        img,
-        (cx + int(1 * escala), cy - int(7 * escala)),
-        (max(5, int(7 * escala)), max(3, int(4 * escala))),
-        0,
-        15,
-        165,
-        (235, 210, 255),
-        max(1, int(2 * escala)),
-        lineType=cv2.LINE_AA,
-    )
-    cv2.circle(img, (cx - int(4 * escala), cy - int(10 * escala)), max(1, int(1.6 * escala)), (235, 210, 255), -1, lineType=cv2.LINE_AA)
-    cv2.circle(img, (cx + int(6 * escala), cy - int(10 * escala)), max(1, int(1.6 * escala)), (235, 210, 255), -1, lineType=cv2.LINE_AA)
-    cv2.circle(img, (cx + int(14 * escala), cy - int(8 * escala)), max(3, int(4 * escala)), suit_shadow, -1, lineType=cv2.LINE_AA)
-
-    # Torso
-    cv2.ellipse(
-        img,
-        (cx, cy + int(10 * escala)),
-        (max(12, int(16 * escala)), max(10, int(13 * escala))),
-        -8,
-        0,
-        360,
-        suit_white,
-        -1,
-        lineType=cv2.LINE_AA,
-    )
-    cv2.rectangle(
-        img,
-        (cx - int(8 * escala), cy + int(7 * escala)),
-        (cx + int(8 * escala), cy + int(12 * escala)),
-        blue,
-        -1,
-    )
-    cv2.rectangle(
-        img,
-        (cx - int(5 * escala), cy + int(4 * escala)),
-        (cx + int(5 * escala), cy + int(11 * escala)),
-        suit_shadow,
-        -1,
-    )
-    cv2.circle(img, (cx - int(2 * escala), cy + int(8 * escala)), max(1, int(2 * escala)), (0, 0, 255), -1, lineType=cv2.LINE_AA)
-    cv2.circle(img, (cx + int(2 * escala), cy + int(8 * escala)), max(1, int(2 * escala)), (0, 200, 0), -1, lineType=cv2.LINE_AA)
-
-    # Brazos
-    cv2.ellipse(img, (cx - int(16 * escala), cy + int(6 * escala)), (max(4, int(6 * escala)), max(7, int(9 * escala))), 40, 0, 360, suit_white, -1, lineType=cv2.LINE_AA)
-    cv2.ellipse(img, (cx + int(16 * escala), cy + int(10 * escala)), (max(4, int(6 * escala)), max(7, int(9 * escala))), -35, 0, 360, suit_white, -1, lineType=cv2.LINE_AA)
-    cv2.circle(img, (cx - int(24 * escala), cy + int(9 * escala)), max(4, int(5 * escala)), gold, -1, lineType=cv2.LINE_AA)
-    cv2.circle(img, (cx + int(23 * escala), cy + int(14 * escala)), max(4, int(5 * escala)), gold, -1, lineType=cv2.LINE_AA)
-
-    # Piernas
-    cv2.ellipse(img, (cx - int(8 * escala), cy + int(26 * escala)), (max(5, int(7 * escala)), max(9, int(12 * escala))), 25, 0, 360, suit_white, -1, lineType=cv2.LINE_AA)
-    cv2.ellipse(img, (cx + int(8 * escala), cy + int(24 * escala)), (max(5, int(7 * escala)), max(9, int(12 * escala))), -30, 0, 360, suit_white, -1, lineType=cv2.LINE_AA)
-    cv2.ellipse(img, (cx - int(10 * escala), cy + int(30 * escala)), (max(5, int(7 * escala)), max(3, int(5 * escala))), 15, 0, 360, blue, -1, lineType=cv2.LINE_AA)
-    cv2.ellipse(img, (cx + int(10 * escala), cy + int(28 * escala)), (max(5, int(7 * escala)), max(3, int(5 * escala))), -20, 0, 360, blue, -1, lineType=cv2.LINE_AA)
-    cv2.ellipse(img, (cx - int(13 * escala), cy + int(38 * escala)), (max(5, int(7 * escala)), max(4, int(6 * escala))), 20, 0, 360, gold, -1, lineType=cv2.LINE_AA)
-    cv2.ellipse(img, (cx + int(13 * escala), cy + int(35 * escala)), (max(5, int(7 * escala)), max(4, int(6 * escala))), -20, 0, 360, gold, -1, lineType=cv2.LINE_AA)
-
-    # Acentos azules
-    cv2.ellipse(img, (cx - int(12 * escala), cy + int(14 * escala)), (max(3, int(4 * escala)), max(3, int(5 * escala))), 35, 0, 360, blue_dark, 2, lineType=cv2.LINE_AA)
-    cv2.ellipse(img, (cx + int(12 * escala), cy + int(18 * escala)), (max(3, int(4 * escala)), max(3, int(5 * escala))), -35, 0, 360, blue_dark, 2, lineType=cv2.LINE_AA)
-
-
 def generar_circulos(num_cuadrados, ancho, alto, cuadrado_size):
     circulos = []
     intentos_max = 1000  # Evita bucles infinitos si el área está muy llena
@@ -253,42 +43,84 @@ def generar_circulos(num_cuadrados, ancho, alto, cuadrado_size):
 
     return circulos
 
-def pintar_circulos(circulos, img):
+def pintar_circulos(circulos, img, puntaje, apuntador=None):
     HEIGHT, WIDTH = img.shape[0:2]
 
     for c in circulos:
-        reaparecio = c.actualizar_reaparicion()
+        reaparecio = c.actualizar_explosion_y_reaparicion()
         if reaparecio:
             c.x = random.randint(0, max(0, WIDTH - c.size))
             c.y = random.randint(0, max(0, HEIGHT - c.size))
 
     for i in range(len(circulos)):
             for j in range(i + 1, len(circulos)):
-                circulos[i].rebotar(circulos[j])
+                a = circulos[i]
+                b = circulos[j]
+                if (not a.activo) or (not b.activo) or a.en_explosion or b.en_explosion:
+                    continue
+
+                misma_altura = abs(a.y - b.y) <= max(8, int(min(a.size, b.size) * 0.75))
+                opuestos = a.tipo != b.tipo
+
+                # Si colisionan y están en la "misma altura" (mismo plano), explotan ambos.
+                if opuestos and misma_altura and a.detectar_colision(b):
+                    a.iniciar_explosion(frames_explosion=10, iteraciones_reaparicion=random.randint(1, 10))
+                    b.iniciar_explosion(frames_explosion=10, iteraciones_reaparicion=random.randint(1, 10))
+                    puntaje -= 1
+                    continue
+
+                a.rebotar(b)
                     
     for circulo in circulos:
         if not circulo.activo:
             continue
-        circulo.mover( WIDTH, HEIGHT)
-        if circulo.tipo == 'malo':
-            dibujar_nave_roja(img, circulo.x, circulo.y, escala=0.85)
-        else:
-            dibujar_astronauta_azul(img, circulo.x, circulo.y, escala=0.9)
 
-    return img
+        # Hacer que los malos "huyan" del apuntador (dedo índice)
+        if apuntador is not None and circulo.tipo == 'malo' and not circulo.en_explosion:
+            ax, ay = apuntador
+            dx = circulo.x - ax
+            dy = circulo.y - ay
+            dist = math.hypot(dx, dy)
+
+            # Solo reaccionar si el jugador está relativamente cerca
+            if dist < 260:
+                # Dirección normalizada alejándose del apuntador
+                if dist > 1e-3:
+                    ndx = dx / dist
+                    ndy = dy / dist
+                else:
+                    ndx, ndy = 0.0, 0.0
+
+                # Velocidad objetivo más alta cuando está muy cerca
+                base_speed = max(6.0, min(14.0, 14.0 * (1.0 - dist / 260.0)))
+                target_vx = ndx * base_speed
+                target_vy = ndy * base_speed
+
+                # Suavizar cambio de velocidad para que no sea brusco
+                mezcla = 0.35
+                circulo.vx = (1.0 - mezcla) * circulo.vx + mezcla * target_vx
+                circulo.vy = (1.0 - mezcla) * circulo.vy + mezcla * target_vy
+
+        circulo.mover(WIDTH, HEIGHT)
+        escala_base = 0.85 if circulo.tipo == 'malo' else 0.9
+        escala = escala_base * circulo.escala_por_altura(HEIGHT)
+        circulo.dibujar(img, escala=escala)
+
+    return img, puntaje
 
 
-def procesar_disparo(circulos, x_mira, y_mira, puntaje):
+def procesar_disparo(circulos, x_mira, y_mira, puntaje, pistola):
     radio_objetivo = 30
     for c in circulos:
-        if not c.activo:
+        if not c.activo or c.en_explosion:
             continue
         if math.hypot(c.x - x_mira, c.y - y_mira) <= radio_objetivo:
+            pistola.reproducir_sonido_objetivo(c.tipo)
             if c.tipo == 'malo':
                 puntaje += 2
             else:
                 puntaje -= 1
-            c.ocultar(random.randint(1, 10))
+            c.iniciar_explosion(frames_explosion=10, iteraciones_reaparicion=random.randint(1, 10))
             break
     return puntaje
 
@@ -364,12 +196,12 @@ print(screeninfo.get_monitors())
 
 mpHands = mp.solutions.hands
 hands = mpHands.Hands(static_image_mode=False,
-                      max_num_hands=2,
+                      max_num_hands=1,
                       min_detection_confidence=0.5,
                       min_tracking_confidence=0.5)
 mpDraw = mp.solutions.drawing_utils
 
-circulos = generar_circulos(5, width, height, 20)
+circulos = generar_circulos(10, width, height, 20)
 
 # Cargar fondo de juego para ocultar la imagen de cámara.
 bg_path = args.bg
@@ -405,22 +237,38 @@ cv2.setWindowProperty("Image", cv2.WND_PROP_ASPECT_RATIO, cv2.WINDOW_FREERATIO)
 puntaje = 0
 pistola = Pistola(shot_cooldown=0.12)
 
+# Variables para guardar estado de la pistola entre frames
+pistola_x = 0
+pistola_y = 0
+show_pistola = False
+
 # Control de FPS para optimizar rendimiento
 target_fps = 30
 frame_time = 1.0 / target_fps
 last_frame_time = time.time()
+mostrar_fondo = True
+mostrar_puntos_mano = False
 
 while True:
     success, cam_img = dm.read()
     if not success or cam_img is None:
         continue
 
-    # Solo usar cámara para tracking; no para render final.
+    # Solo usar cámara para tracking; no para render final directo (salvo cuando se pide con 'b').
     cam_img = cv2.flip(cam_img, 1)
     imgRGB = cv2.cvtColor(cam_img, cv2.COLOR_BGR2RGB)
     results = hands.process(imgRGB)
-
-    game_img = game_bg.copy()
+    print(results.multi_hand_landmarks)
+    
+    if mostrar_fondo:
+        game_img = game_bg.copy()
+    else:
+        # Usar lo que ve la cámara como fondo de juego
+        game_img = cv2.resize(
+            cam_img,
+            (game_bg.shape[1], game_bg.shape[0]),
+            interpolation=cv2.INTER_AREA,
+        )
     cam_h, cam_w = cam_img.shape[0:2]
     game_h, game_w = game_img.shape[0:2]
 
@@ -445,14 +293,15 @@ while True:
                 x4, y4 = landmarks[4]  # thumb_tip
                 x8, y8 = landmarks[8]
                 
-                # Visualizar los puntos del pulgar en colores
-                cv2.circle(game_img, (x2, y2), 8, (255, 0, 0), -1)  # Azul - thumb_mcp (base)
-                cv2.circle(game_img, (x3, y3), 8, (0, 255, 0), -1)  # Verde - thumb_ip (medio)
-                cv2.circle(game_img, (x4, y4), 8, (0, 0, 255), -1)  # Rojo - thumb_tip (punta)
-                cv2.circle(game_img, (x8, y8), 8, (255, 255, 0), -1)  # Cyan - index_tip
-                
-                # Líneas para visualizar la dirección del pulgar
-                cv2.line(game_img, (x2, y2), (x4, y4), (200, 200, 200), 2)
+                # Visualizar los puntos y la dirección solo si está habilitado
+                if mostrar_puntos_mano:
+                    cv2.circle(game_img, (x2, y2), 8, (255, 0, 0), -1)  # Azul - thumb_mcp (base)
+                    cv2.circle(game_img, (x3, y3), 8, (0, 255, 0), -1)  # Verde - thumb_ip (medio)
+                    cv2.circle(game_img, (x4, y4), 8, (0, 0, 255), -1)  # Rojo - thumb_tip (punta)
+                    cv2.circle(game_img, (x8, y8), 8, (255, 255, 0), -1)  # Cyan - index_tip
+                    
+                    # Líneas para visualizar la dirección del pulgar
+                    cv2.line(game_img, (x2, y2), (x4, y4), (200, 200, 200), 2)
                 
                 # Actualizar estado de pistola basado en dirección del pulgar
                 disparo_generado = pistola.actualizar_estado(landmarks)
@@ -461,43 +310,57 @@ while True:
                 if disparo_generado:
                     shooting_now = True
                     pistola.reproducir_sonido()
-                    puntaje = procesar_disparo(circulos, x4, y4, puntaje)
+                    # Usar el dedo índice como apuntador
+                    puntaje = procesar_disparo(circulos, x8, y8, puntaje, pistola)
 
-                # Dibujar arma en la posición del pulgar.
-                pistola.dibujar(game_img, x4, y4, 2)
-                
-                # Obtener estado para la barra de carga
-                energia = pistola.get_energia_carga()
-                armada = pistola.esta_armada()
-                
-                # Barra de carga arriba de la pistola
-                barra_y = y4 - 40
-                barra_ancho = 40
-                barra_alto = 6
-                barra_x = x4 - barra_ancho // 2
-                
-                # Fondo de la barra
-                cv2.rectangle(game_img, (barra_x, barra_y), (barra_x + barra_ancho, barra_y + barra_alto), (50, 50, 50), -1)
-                
-                # Barra de carga (color cambia según estado)
-                if armada:
-                    color_barra = (0, 255, 0)  # Verde cuando está armada
-                else:
-                    color_barra = (0, 165 + int(90 * energia), 255)  # Azul/Cyan progresivo
-                
-                carga_visual = int(barra_ancho * energia)
-                cv2.rectangle(game_img, (barra_x, barra_y), (barra_x + carga_visual, barra_y + barra_alto), color_barra, -1)
-                
-                # Borde de la barra
-                cv2.rectangle(game_img, (barra_x, barra_y), (barra_x + barra_ancho, barra_y + barra_alto), (200, 200, 200), 1)
+                # Guardar coordenadas para dibujar después (apuntador = dedo índice)
+                pistola_x = x8
+                pistola_y = y8
+                show_pistola = True
                 
                 # Debug: mostrar estado actual
+                energia = pistola.get_energia_carga()
+                armada = pistola.esta_armada()
                 estado_text = "ARMADA ✓" if armada else f"Cargando {int(energia*100)}%"
-                debug_info = pistola.get_debug_info(landmarks)
+                #debug_info = pistola.get_debug_info(landmarks)
                 cv2.putText(game_img, estado_text, (10, 100), cv2.FONT_HERSHEY_PLAIN, 2, (0, 255, 255), 2)
-                cv2.putText(game_img, debug_info, (10, 130), cv2.FONT_HERSHEY_PLAIN, 2, (100, 200, 200), 2)
+                #cv2.putText(game_img, debug_info, (10, 130), cv2.FONT_HERSHEY_PLAIN, 2, (100, 200, 200), 2)
 
-    pintar_circulos(circulos, game_img)
+    # Dibujar los objetos móviles (naves y ovnis)
+    apuntador = (pistola_x, pistola_y) if show_pistola else None
+    game_img, puntaje = pintar_circulos(circulos, game_img, puntaje, apuntador)
+    
+    # Dibujar pistola DESPUÉS de los objetos móviles
+    if show_pistola:
+        pistola.dibujar(game_img, pistola_x, pistola_y, 2)
+        
+        # Obtener estado para la barra de carga
+        energia = pistola.get_energia_carga()
+        armada = pistola.esta_armada()
+        
+        # Barra de carga arriba de la pistola
+        barra_y = pistola_y - 40
+        barra_ancho = 40
+        barra_alto = 6
+        barra_x = pistola_x - barra_ancho // 2
+        
+        # Fondo de la barra
+        cv2.rectangle(game_img, (barra_x, barra_y), (barra_x + barra_ancho, barra_y + barra_alto), (50, 50, 50), -1)
+        
+        # Barra de carga (color cambia según estado)
+        if armada:
+            color_barra = (0, 255, 0)  # Verde cuando está armada
+        else:
+            color_barra = (0, 165 + int(90 * energia), 255)  # Azul/Cyan progresivo
+        
+        carga_visual = int(barra_ancho * energia)
+        cv2.rectangle(game_img, (barra_x, barra_y), (barra_x + carga_visual, barra_y + barra_alto), color_barra, -1)
+        
+        # Borde de la barra
+        cv2.rectangle(game_img, (barra_x, barra_y), (barra_x + barra_ancho, barra_y + barra_alto), (200, 200, 200), 1)
+        
+        # Reset para el siguiente frame
+        show_pistola = False
 
     cv2.putText(game_img, str(int(puntaje)), (10, 70), cv2.FONT_HERSHEY_PLAIN, 3, (255, 0, 255), 3)
     # Redimensionar por seguridad al tamaño del monitor.
@@ -516,6 +379,10 @@ while True:
     
     last_frame_time = time.time()
     
+    if k == ord('b') or k == ord('B'):
+        mostrar_fondo = not mostrar_fondo
+    if k == ord('h') or k == ord('H'):
+        mostrar_puntos_mano = not mostrar_puntos_mano
     if k == 27:
         cv2.destroyAllWindows()
         dm.release()

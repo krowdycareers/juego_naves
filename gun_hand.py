@@ -179,6 +179,36 @@ class Pistola:
                 pass
         
         threading.Thread(target=_play_shot_sound, daemon=True).start()
+
+    def reproducir_sonido_objetivo(self, tipo):
+        """Reproduce un sonido distinto al destruir nave/astronauta."""
+        def _play_target_sound():
+            try:
+                system = platform.system().lower()
+
+                # 'malo' = nave, 'bueno' = astronauta
+                if str(tipo).lower() == 'malo':
+                    mac_sound = '/System/Library/Sounds/Glass.aiff'
+                    win_alias = 'SystemHand'
+                else:
+                    mac_sound = '/System/Library/Sounds/Funk.aiff'
+                    win_alias = 'SystemExclamation'
+
+                if system == 'darwin':
+                    subprocess.Popen(
+                        ['afplay', mac_sound],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                elif system.startswith('win'):
+                    import winsound
+                    winsound.PlaySound(win_alias, winsound.SND_ALIAS | winsound.SND_ASYNC)
+                else:
+                    print('\a', end='', flush=True)
+            except Exception:
+                pass
+
+        threading.Thread(target=_play_target_sound, daemon=True).start()
     
     def dibujar(self, img, x, y, size=1):
         """Dibuja la pistola futurista en la imagen.
