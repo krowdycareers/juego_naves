@@ -20,7 +20,7 @@ CAMERA_BUFFER_SIZE = 1
 
 # ===== Pantalla =====
 FULLSCREEN = True
-SCREEN_INDEX = 0
+SCREEN_INDEX = 1
 
 # ===== Juego - Parámetros generales =====
 TARGET_FPS = 30

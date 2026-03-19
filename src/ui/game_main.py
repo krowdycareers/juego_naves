@@ -31,6 +31,7 @@ class GameMain:
         self.camera_manager = CameraManager(
             mode=config.CAMERA_MODE,
             cam_index=camera_index,
+            screen_index=config.SCREEN_INDEX,
             max_cam_search=config.CAMERA_MAX_SEARCH,
             fullscreen=config.FULLSCREEN
         )
@@ -148,8 +149,7 @@ class GameMain:
     def run(self):
         """Loop principal del juego."""
         print("[DEBUG] Creando ventana de juego...")
-        cv2.namedWindow("Messi Game", cv2.WINDOW_NORMAL)
-        cv2.resizeWindow("Messi Game", self.width, self.height)
+        self.camera_manager.create_window("Messi Game")
 
         print(f"[DEBUG] Dimensiones: {self.width}x{self.height}")
         print("[DEBUG] Iniciando loop principal...")
@@ -210,6 +210,8 @@ class GameMain:
                 (255, 0, 255),
                 3
             )
+
+            game_img = self.camera_manager.resize_to_screen(game_img)
 
             # Mostrar en ventana (sin redimensionar extra)
             cv2.imshow("Messi Game", game_img)

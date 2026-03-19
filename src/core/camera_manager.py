@@ -51,7 +51,15 @@ class CameraManager:
         self.backend = self._preferred_backend()
 
         # Información de monitor
-        self.monitor = screeninfo.get_monitors()[screen_index]
+        monitors = screeninfo.get_monitors()
+        if not monitors:
+            raise RuntimeError("No se detectaron monitores")
+        if screen_index < 0 or screen_index >= len(monitors):
+            screen_index = min(max(0, screen_index), len(monitors) - 1)
+        self.screen_index = screen_index
+        self.monitor = monitors[screen_index]
+        self.monitor_x = getattr(self.monitor, 'x', 0)
+        self.monitor_y = getattr(self.monitor, 'y', 0)
         self.width = self.monitor.width
         self.height = self.monitor.height
 
@@ -71,6 +79,33 @@ class CameraManager:
         if system.startswith('win'):
             return cv2.CAP_DSHOW
         return cv2.CAP_V4L2
+
+    def apply_window_mode(self, name, fullscreen=None):
+        """Aplica fullscreen solo en pantallas secundarias."""
+        if fullscreen is None:
+            fullscreen = self.fullscreen
+
+        use_fullscreen = fullscreen and self.screen_index > 0
+
+        if use_fullscreen:
+            cv2.setWindowProperty(
+                name,
+                cv2.WND_PROP_FULLSCREEN,
+                cv2.WINDOW_FULLSCREEN
+            )
+            cv2.setWindowProperty(
+                name,
+                cv2.WND_PROP_ASPECT_RATIO,
+                cv2.WINDOW_FREERATIO
+            )
+            return
+
+        cv2.setWindowProperty(
+            name,
+            cv2.WND_PROP_ASPECT_RATIO,
+            cv2.WINDOW_FREERATIO
+        )
+        cv2.resizeWindow(name, self.width, self.height)
 
     def _init_camera(self):
         """Inicializa la captura de cámara."""
@@ -229,7 +264,9 @@ class CameraManager:
             if event == cv2.EVENT_LBUTTONDOWN and hover['id'] is not None:
                 selected['id'] = hover['id']
 
-        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+        cv2.namedWindow("Image", cv2.WINDOW_NORMAL)
+        # Poner la ventana en fullscreen
+        # Evitar franjas laterales por preservación de aspect ratio de la ventana.
         cv2.setMouseCallback(window_name, _on_mouse)
 
         while True:
@@ -377,6 +414,7 @@ class CameraManager:
     def create_window(self, name='Window'):
         """Crea una ventana."""
         cv2.namedWindow(name, cv2.WINDOW_NORMAL)
+        self.apply_window_mode(name)
 
     def resize_to_screen(self, frame):
         """Redimensiona un frame al tamaño de la pantalla."""
