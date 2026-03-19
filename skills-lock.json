@@ -5,6 +5,11 @@
       "source": "mindrally/skills",
       "sourceType": "github",
       "computedHash": "07d2f35a381b86991164e77833f661e55420a92c8d879473b504dce1fc945af5"
+    },
+    "python-design-patterns": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "computedHash": "b70500bae0d16740d8a359be63c4645a0ab0f9b839d11d181c45d20958313698"
     }
   }
 }

@@ -1,13 +1,28 @@
+"""
+SpaceEntity - Representa naves y astronautas en el juego.
+Maneja movimiento, colisiones, explosiones y renderizado.
+"""
+
 import math
 import time
 
 import cv2
 import numpy as np
 
+from ..core import config
 
-class circulo:
+
+class SpaceEntity:
+    """
+    Entidad espacial: nave o astronauta.
+    
+    Tipos:
+    - 'malo': Nave enemiga (roja)
+    - 'bueno': Astronauta amigo (azul)
+    """
+
     def __init__(self, x, y, size, vx=0, vy=0, tipo='bueno'):
-        """Inicializa un cuadrado en movimiento."""
+        """Inicializa una entidad espacial."""
         self.x = x
         self.y = y
         self.size = size
