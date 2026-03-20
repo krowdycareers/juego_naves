@@ -24,6 +24,7 @@ wheels/
 venv/
 ENV/
 env/
+.venv/
 
 # IDE
 .vscode/
@@ -40,6 +41,7 @@ env/
 # Cache
 .pytest_cache/
 .mypy_cache/
+.cache/
 
 # Logs
 *.log

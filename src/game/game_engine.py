@@ -5,8 +5,6 @@ Contiene la lógica de juego, colisiones, entidades y puntuación.
 
 import random
 import math
-import cv2
-import numpy as np
 
 from ..core import config
 from .space_entity import SpaceEntity
@@ -16,7 +14,7 @@ from .weapon import Weapon
 class GameEngine:
     """Motor del juego que maneja lógica, entidades y física."""
 
-    def __init__(self, screen_width, screen_height):
+    def __init__(self, screen_width, screen_height, weapon=None):
         """
         Args:
             screen_width: Ancho de la pantalla
@@ -26,7 +24,7 @@ class GameEngine:
         self.height = screen_height
         self.score = 0
         self.entities = []
-        self.weapon = Weapon()
+        self.weapon = weapon or Weapon()
         
         self._initialize_entities()
 
@@ -206,7 +204,7 @@ class GameEngine:
 
     def render_entities(self, game_frame):
         """
-        Renderiza todas las entidades.
+        Shim de compatibilidad para el backend OpenCV actual.
         
         Args:
             game_frame: Frame donde dibujar
@@ -214,18 +212,10 @@ class GameEngine:
         Returns:
             Frame actualizado
         """
-        HEIGHT, WIDTH = game_frame.shape[0:2]
+        from ..rendering import OpenCVEntityRenderer
 
-        # Dibujar entidades
-        for entity in self.entities:
-            if not entity.activo:
-                continue
-
-            escala_base = 0.85 if entity.tipo == 'malo' else 0.9
-            escala = escala_base * entity.escala_por_altura(HEIGHT)
-            entity.dibujar(game_frame, escala=escala)
-
-        return game_frame
+        renderer = OpenCVEntityRenderer()
+        return renderer.render_entities(self.entities, game_frame)
 
     def get_score(self):
         """Retorna la puntuación actual."""

@@ -46,11 +46,18 @@ src/
 # 1. Clonar o descargar el proyecto
 cd messi-project
 
-# 2. Instalar dependencias
-pip install -r requirements.txt
+# 2. Crear entorno e instalar dependencias
+make setup
 
 # 3. Ejecutar el juego
-python main.py
+make start
+
+# Alternativa: ejecutar como módulo
+.venv/bin/python -m src
+
+# Alternativa estilo comando de proyecto
+pip install -e .
+messi-start
 ```
 
 ## 🎮 Cómo Jugar
@@ -98,7 +105,11 @@ python main.py --cam 1
 python main.py --bg path/to/image.jpg
 
 # Sin selector interactivo de cámara
-python main.py --no-interactive
+make start-no-interactive
+
+# Las mismas opciones también funcionan así
+.venv/bin/python -m src --no-interactive
+messi-start --no-interactive
 ```
 
 ## 📁 Estructura de Archivos
@@ -106,10 +117,13 @@ python main.py --no-interactive
 ```
 messi-project/
 ├── main.py                 # Punto de entrada
+├── pyproject.toml          # Configuración del proyecto y script ejecutable
 ├── requirements.txt        # Dependencias
 ├── README.md              # Este archivo
 ├── .gitignore
 ├── assets/                # Recursos (imágenes, etc)
+├── tests/                 # Tests automatizables
+├── manual_tests/          # Pruebas manuales/visuales
 └── src/
     ├── __init__.py
     ├── core/

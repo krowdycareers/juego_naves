@@ -18,7 +18,7 @@ print(f"[TEST] Background min/max values: {game.background.min()}/{game.backgrou
 # Generar algunos frames para test
 game_img = game.background.copy()
 game.engine.update(game_img)
-game_img = game.engine.render_entities(game_img, None)
+game_img = game.entity_renderer.render_entities(game.engine.entities, game_img)
 
 print(f"[TEST] Primer frame renderizado: shape={game_img.shape}, min/max={game_img.min()}/{game_img.max()}")
 

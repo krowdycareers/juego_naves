@@ -14,13 +14,13 @@ import numpy as np
 from ..core.camera_manager import CameraManager
 from ..core import config
 from ..game.game_engine import GameEngine
-from ..game.weapon import Weapon
+from ..rendering import OpenCVEntityRenderer, OpenCVWeaponRenderer
 
 
 class GameMain:
     """Controlador principal del juego."""
 
-    def __init__(self, camera_index=None, background_path=None, no_interactive=False):
+    def __init__(self, camera_index=None, background_path=None, no_interactive=False, weapon=None):
         """
         Args:
             camera_index: Índice de cámara (None = automático)
@@ -75,8 +75,10 @@ class GameMain:
 
         # Inicializar motor de juego
         print("[DEBUG] Inicializando GameEngine...")
-        self.engine = GameEngine(self.width, self.height)
+        self.engine = GameEngine(self.width, self.height, weapon=weapon)
         print("[DEBUG] GameEngine inicializado")
+        self.entity_renderer = OpenCVEntityRenderer()
+        self.weapon_renderer = OpenCVWeaponRenderer()
 
         # Estado de la UI
         self.show_background = True
@@ -86,6 +88,76 @@ class GameMain:
         self.pistola_y = 0
         self.show_pistola = False
         print("[DEBUG] GameMain inicializado completamente")
+
+    def _compose_game_frame(self, frame_count):
+        """Construye un frame completo del juego sin asumir backend de ventana."""
+        success, cam_img = self.camera_manager.read()
+        if not success or cam_img is None:
+            if frame_count == 1:
+                print(f"[WARNING] No hay cámara disponible, usando fondo estático")
+            game_img = self.background.copy()
+            results = None
+        else:
+            cam_img = cv2.flip(cam_img, 1)
+            img_rgb = cv2.cvtColor(cam_img, cv2.COLOR_BGR2RGB)
+            results = self.hands.process(img_rgb)
+
+            if self.show_background:
+                game_img = self.background.copy()
+            else:
+                game_img = cv2.resize(
+                    cam_img,
+                    (self.background.shape[1], self.background.shape[0]),
+                    interpolation=cv2.INTER_AREA
+                )
+
+        if results is not None:
+            firing, pointer_x, pointer_y = self._process_hand_landmarks(results, cam_img if 'cam_img' in locals() else None)
+        else:
+            firing = False
+            pointer_x = self.pistola_x
+            pointer_y = self.pistola_y
+
+        apuntador = (pointer_x, pointer_y) if self.show_pistola else None
+
+        self.engine.update(game_img, pointer=apuntador)
+        game_img = self.entity_renderer.render_entities(self.engine.entities, game_img)
+
+        if self.show_pistola:
+            game_img = self.weapon_renderer.draw(
+                self.engine.weapon,
+                game_img,
+                self.pistola_x,
+                self.pistola_y,
+                size=2,
+            )
+
+        cv2.putText(
+            game_img,
+            str(self.engine.get_score()),
+            (10, 70),
+            cv2.FONT_HERSHEY_PLAIN,
+            3,
+            (255, 0, 255),
+            3
+        )
+
+        self.show_pistola = False
+        return self.camera_manager.resize_to_screen(game_img)
+
+    def _handle_opencv_key(self, key):
+        """Procesa una tecla de OpenCV y retorna False si se debe cerrar."""
+        if key == ord('b') or key == ord('B'):
+            self.show_background = not self.show_background
+            print(f"[DEBUG] Toggle background: {self.show_background}")
+            return True
+        if key == ord('h') or key == ord('H'):
+            self.show_hand_points = not self.show_hand_points
+            return True
+        if key == 27:
+            print("[DEBUG] ESC presionado, saliendo...")
+            return False
+        return True
 
     def _load_background(self, bg_path=None):
         """Carga la imagen de fondo."""
@@ -158,60 +230,7 @@ class GameMain:
         running = True
         while running:
             frame_count += 1
-            
-            success, cam_img = self.camera_manager.read()
-            if not success or cam_img is None:
-                # Sin cámara: simplemente mostrar el background
-                if frame_count == 1:
-                    print(f"[WARNING] No hay cámara disponible, usando fondo estático")
-                game_img = self.background.copy()
-                results = None
-            else:
-                cam_img = cv2.flip(cam_img, 1)
-                img_rgb = cv2.cvtColor(cam_img, cv2.COLOR_BGR2RGB)
-                results = self.hands.process(img_rgb)
-
-                # Preparar imagen del juego
-                if self.show_background:
-                    game_img = self.background.copy()
-                else:
-                    game_img = cv2.resize(
-                        cam_img,
-                        (self.background.shape[1], self.background.shape[0]),
-                        interpolation=cv2.INTER_AREA
-                    )
-
-            # Procesar mano y detectar disparo (si hay detección)
-            if results is not None:
-                firing, pointer_x, pointer_y = self._process_hand_landmarks(results, cam_img if 'cam_img' in locals() else None)
-            else:
-                firing = False
-                pointer_x = self.pistola_x
-                pointer_y = self.pistola_y
-
-            # Preparar apuntador para huida
-            apuntador = (pointer_x, pointer_y) if self.show_pistola else None
-
-            # Actualizar motor de juego (con apuntador para huida)
-            self.engine.update(game_img, pointer=apuntador)
-            game_img = self.engine.render_entities(game_img)
-
-            # Dibujar pistola
-            if self.show_pistola:
-                game_img = self.engine.weapon.dibujar(game_img, self.pistola_x, self.pistola_y, 2)
-
-            # Dibujar puntuación
-            cv2.putText(
-                game_img,
-                str(self.engine.get_score()),
-                (10, 70),
-                cv2.FONT_HERSHEY_PLAIN,
-                3,
-                (255, 0, 255),
-                3
-            )
-
-            game_img = self.camera_manager.resize_to_screen(game_img)
+            game_img = self._compose_game_frame(frame_count)
 
             # Mostrar en ventana (sin redimensionar extra)
             cv2.imshow("Messi Game", game_img)
@@ -226,18 +245,7 @@ class GameMain:
                 key = cv2.waitKey(1)
 
             self.last_frame_time = time.time()
-
-            # Procesar entrada
-            if key == ord('b') or key == ord('B'):
-                self.show_background = not self.show_background
-                print(f"[DEBUG] Toggle background: {self.show_background}")
-            elif key == ord('h') or key == ord('H'):
-                self.show_hand_points = not self.show_hand_points
-            elif key == 27:  # ESC
-                print("[DEBUG] ESC presionado, saliendo...")
-                running = False
-
-            self.show_pistola = False
+            running = self._handle_opencv_key(key)
 
         print("[DEBUG] Limpiando...")
         cv2.destroyAllWindows()
@@ -251,13 +259,30 @@ def main():
     parser.add_argument('--cam', type=int, help='Índice de cámara')
     parser.add_argument('--bg', type=str, help='Ruta de imagen de fondo')
     parser.add_argument('--no-interactive', action='store_true', help='Sin selector de cámara')
+    parser.add_argument(
+        '--backend',
+        choices=['opencv', 'pygame'],
+        default=config.UI_BACKEND,
+        help='Backend de ventana/render a utilizar'
+    )
     args = parser.parse_args()
 
-    game = GameMain(
-        camera_index=args.cam,
-        background_path=args.bg,
-        no_interactive=args.no_interactive
-    )
+    if args.backend == 'pygame':
+        from .pygame_main import PygameMain
+
+        game = PygameMain(
+            camera_index=args.cam,
+            background_path=args.bg,
+            no_interactive=args.no_interactive
+        )
+    else:
+        game = GameMain(
+            camera_index=args.cam,
+            background_path=args.bg,
+            no_interactive=args.no_interactive
+        )
+
+    game.run()
     game.run()
 
 
