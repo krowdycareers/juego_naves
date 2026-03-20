@@ -129,10 +129,3 @@ class SpaceEntity:
         t = t * t
 
         return float(min_scale + (max_scale - min_scale) * t)
-
-    def dibujar(self, img, escala=1.0):
-        """Mantiene compatibilidad con el render OpenCV actual."""
-        from ..rendering import OpenCVEntityRenderer
-
-        renderer = OpenCVEntityRenderer()
-        renderer.render_entity(self, img, escala=escala)

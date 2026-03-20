@@ -8,7 +8,7 @@ import numpy as np
 from ..audio import PygameSoundPlayer
 from ..core import config
 from ..game.weapon import Weapon
-from .game_main import GameMain
+from .base_game import BaseGameApp
 
 try:
     import pygame
@@ -16,7 +16,7 @@ except ImportError:
     pygame = None
 
 
-class PygameMain(GameMain):
+class PygameMain(BaseGameApp):
     """Ejecuta el juego usando pygame para ventana, eventos y reloj."""
 
     def __init__(self, camera_index=None, background_path=None, no_interactive=False):
@@ -82,7 +82,7 @@ class PygameMain(GameMain):
             if not running:
                 break
 
-            game_img = self._compose_game_frame(frame_count)
+            game_img = self.compose_game_frame(frame_count)
             surface = self._frame_to_surface(game_img)
             self.screen.blit(surface, (0, 0))
             pygame.display.flip()
@@ -90,5 +90,5 @@ class PygameMain(GameMain):
 
         print("[DEBUG] Limpiando pygame...")
         pygame.quit()
-        self.camera_manager.release()
+        self.shutdown()
         print("[DEBUG] Juego finalizado")

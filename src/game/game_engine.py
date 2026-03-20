@@ -202,21 +202,6 @@ class GameEngine:
 
         return False
 
-    def render_entities(self, game_frame):
-        """
-        Shim de compatibilidad para el backend OpenCV actual.
-        
-        Args:
-            game_frame: Frame donde dibujar
-            
-        Returns:
-            Frame actualizado
-        """
-        from ..rendering import OpenCVEntityRenderer
-
-        renderer = OpenCVEntityRenderer()
-        return renderer.render_entities(self.entities, game_frame)
-
     def get_score(self):
         """Retorna la puntuación actual."""
         return int(self.score)

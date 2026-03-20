@@ -173,9 +173,3 @@ class Weapon:
         """Reproduce un sonido distinto al destruir nave/astronauta."""
         self.sound_player.play_target_hit(tipo)
     
-    def dibujar(self, img, x, y, size=1):
-        """Mantiene compatibilidad con el render OpenCV actual."""
-        from ..rendering import OpenCVWeaponRenderer
-
-        renderer = OpenCVWeaponRenderer()
-        return renderer.draw(self, img, x, y, size=size)
