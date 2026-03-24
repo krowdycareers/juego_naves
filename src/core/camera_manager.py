@@ -6,7 +6,6 @@ Proporciona acceso a frames de video y gestión de resolución.
 import cv2
 import screeninfo
 import platform
-import math
 
 try:
     import mss
@@ -20,17 +19,11 @@ except ImportError:
 
 
 class CameraManager:
-    """Gestiona cámara o captura de pantalla y pantalla completa.
+    """Gestiona cámara o captura de pantalla para alimentar el loop del juego.
 
     Soporta dos modos:
     - 'camera': Captura desde una webcam
     - 'screen': Captura de pantalla
-
-    Ejemplo:
-        manager = CameraManager(mode='camera')
-        manager.create_window('Game')
-        success, frame = manager.read()
-        manager.release()
     """
 
     def __init__(self, mode='camera', cam_index=None, screen_index=0, 
@@ -95,36 +88,6 @@ class CameraManager:
 
         # Mantiene el comportamiento previo para setups multi-monitor en otros SO.
         return self.screen_index > 0
-
-    def apply_window_mode(self, name, fullscreen=None):
-        """Aplica el modo de ventana adecuado para el monitor seleccionado."""
-        use_fullscreen = self.should_use_fullscreen(fullscreen)
-
-        # Coloca la ventana en el monitor seleccionado antes de ajustar el modo.
-        try:
-            cv2.moveWindow(name, self.monitor_x, self.monitor_y)
-        except Exception:
-            pass
-
-        if use_fullscreen:
-            cv2.setWindowProperty(
-                name,
-                cv2.WND_PROP_FULLSCREEN,
-                cv2.WINDOW_FULLSCREEN
-            )
-            cv2.setWindowProperty(
-                name,
-                cv2.WND_PROP_ASPECT_RATIO,
-                cv2.WINDOW_FREERATIO
-            )
-            return
-
-        cv2.setWindowProperty(
-            name,
-            cv2.WND_PROP_ASPECT_RATIO,
-            cv2.WINDOW_FREERATIO
-        )
-        cv2.resizeWindow(name, self.width, self.height)
 
     def _init_camera(self):
         """Inicializa la captura de cámara."""
@@ -217,204 +180,6 @@ class CameraManager:
             for (i, w, h) in cams
         ]
 
-    def choose_camera_grid_interactively(self, window_name='Selecciona camara'):
-        """Muestra una pantalla de introducción con mosaico en vivo y permite elegir cámara.
-
-        Controles:
-        - Click izquierdo sobre una celda para seleccionar cámara.
-        - Tecla numérica (0-9) para seleccionar por índice.
-        - `q` o `ESC` para cancelar.
-        - Flechas para navegar, ENTER para seleccionar.
-        """
-        if self.mode != 'camera':
-            return None
-        if np is None:
-            return None
-
-        # Liberar cámara actual para evitar bloquear nuevos VideoCapture.
-        if self.cap is not None:
-            try:
-                self.cap.release()
-            except Exception:
-                pass
-            self.cap = None
-
-        opened = []
-        for i in range(self.max_cam_search + 1):
-            cap_t = self._open_capture(i)
-            if cap_t is None or not cap_t.isOpened():
-                try:
-                    if cap_t is not None:
-                        cap_t.release()
-                except Exception:
-                    pass
-                continue
-            ret, frame = cap_t.read()
-            if not ret or frame is None:
-                try:
-                    cap_t.release()
-                except Exception:
-                    pass
-                continue
-            opened.append({'id': i, 'cap': cap_t, 'last_frame': frame})
-
-        if not opened:
-            return None
-
-        selected = {'id': None}
-        mouse = {'x': 0, 'y': 0, 'inside': False}
-        hover = {'id': None}
-        tiles = []
-        selected_pos = 0
-        ids = [item['id'] for item in opened]
-        if self.cam_index in ids:
-            selected_pos = ids.index(self.cam_index)
-
-        def _on_mouse(event, x, y, flags, param):
-            mouse['x'] = x
-            mouse['y'] = y
-            mouse['inside'] = True
-            hover['id'] = None
-            for t in tiles:
-                x0, y0, x1, y1 = t['rect']
-                if x0 <= x <= x1 and y0 <= y <= y1:
-                    hover['id'] = t['id']
-                    break
-            if event == cv2.EVENT_LBUTTONDOWN and hover['id'] is not None:
-                selected['id'] = hover['id']
-
-        cv2.namedWindow("Image", cv2.WINDOW_NORMAL)
-        # Poner la ventana en fullscreen
-        # Evitar franjas laterales por preservación de aspect ratio de la ventana.
-        cv2.setMouseCallback(window_name, _on_mouse)
-
-        while True:
-            n = len(opened)
-            cols = max(1, int(math.ceil(math.sqrt(n))))
-            rows = int(math.ceil(n / cols))
-            header_h = 70
-            gap = 10
-            mosaic_w = max(640, self.width)
-            mosaic_h = max(480, self.height)
-            tile_w = max(160, (mosaic_w - (cols + 1) * gap) // cols)
-            tile_h = max(120, (mosaic_h - header_h - (rows + 1) * gap) // rows)
-
-            canvas = np.zeros((mosaic_h, mosaic_w, 3), dtype=np.uint8)
-            cv2.putText(
-                canvas,
-                'Flechas+Enter | Click para elegir | Tecla numerica | ESC/q para salir',
-                (16, 34),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.75,
-                (230, 230, 230),
-                2
-            )
-
-            tiles = []
-            for idx, item in enumerate(opened):
-                ret, frame = item['cap'].read()
-                if ret and frame is not None:
-                    item['last_frame'] = frame
-                frame = item['last_frame']
-                resized = cv2.resize(frame, (tile_w, tile_h), interpolation=cv2.INTER_AREA)
-
-                r = idx // cols
-                c = idx % cols
-                x0 = gap + c * (tile_w + gap)
-                y0 = header_h + gap + r * (tile_h + gap)
-                x1 = x0 + tile_w
-                y1 = y0 + tile_h
-                if y1 > mosaic_h or x1 > mosaic_w:
-                    continue
-                canvas[y0:y1, x0:x1] = resized
-
-                label = f"Cam {item['id']}"
-                cv2.putText(canvas, label, (x0 + 8, y0 + 28), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 255, 0), 2)
-
-                # Borde base
-                border_color = (80, 80, 80)
-                border_thickness = 2
-                if idx == selected_pos:
-                    border_color = (0, 255, 0)
-                    border_thickness = 4
-                    cv2.putText(
-                        canvas,
-                        'ENTER para seleccionar',
-                        (x0 + 8, y1 - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.55,
-                        (0, 255, 0),
-                        2
-                    )
-
-                # Hover visual: "por seleccionarlo"
-                if hover['id'] == item['id']:
-                    overlay = canvas[y0:y1, x0:x1].copy()
-                    hover_tint = np.full_like(overlay, (40, 200, 255))
-                    overlay = cv2.addWeighted(overlay, 0.78, hover_tint, 0.22, 0)
-                    canvas[y0:y1, x0:x1] = overlay
-                    border_color = (0, 200, 255)
-                    border_thickness = max(border_thickness, 4)
-
-                cv2.rectangle(canvas, (x0, y0), (x1, y1), border_color, border_thickness)
-                tiles.append({'id': item['id'], 'rect': (x0, y0, x1, y1)})
-
-            # Cursor "manito" dibujado
-            if mouse['inside']:
-                mx, my = mouse['x'], mouse['y']
-                hand_color = (0, 220, 255) if hover['id'] is not None else (200, 200, 200)
-                # Dedo
-                cv2.line(canvas, (mx, my), (mx, my + 18), hand_color, 3)
-                # Palma simple
-                cv2.rectangle(canvas, (mx - 6, my + 14), (mx + 8, my + 28), hand_color, 2)
-
-            cv2.imshow(window_name, canvas)
-            key = cv2.waitKeyEx(16)
-            key_low = key & 0xFF
-            if key in (27, ord('q')):
-                break
-            if key in (10, 13):
-                selected['id'] = opened[selected_pos]['id']
-            elif key in (81, 2424832, 65361, 63234) or key_low in (2,):  # left
-                if selected_pos % cols > 0:
-                    selected_pos -= 1
-            elif key in (83, 2555904, 65363, 63235) or key_low in (3,):  # right
-                if selected_pos % cols < cols - 1 and selected_pos + 1 < len(opened):
-                    selected_pos += 1
-            elif key in (82, 2490368, 65362, 63232) or key_low in (0,):  # up
-                if selected_pos - cols >= 0:
-                    selected_pos -= cols
-            elif key in (84, 2621440, 65364, 63233) or key_low in (1,):  # down
-                if selected_pos + cols < len(opened):
-                    selected_pos += cols
-            elif ord('0') <= key <= ord('9'):
-                key_idx = key - ord('0')
-                if any(item['id'] == key_idx for item in opened):
-                    selected_pos = ids.index(key_idx)
-                    selected['id'] = key_idx
-            if selected['id'] is not None:
-                break
-
-        selected_id = selected['id']
-        selected_cap = None
-        for item in opened:
-            if selected_id is not None and item['id'] == selected_id:
-                selected_cap = item['cap']
-            else:
-                try:
-                    item['cap'].release()
-                except Exception:
-                    pass
-
-        cv2.destroyWindow(window_name)
-
-        if selected_id is None:
-            return None
-
-        self.cap = selected_cap
-        self.cam_index = selected_id
-        return selected_id
-
     def read(self):
         """Lee un frame."""
         if self.mode == 'camera':
@@ -429,11 +194,6 @@ class CameraManager:
             frame_cv = np.array(frame)
             frame_cv = cv2.cvtColor(frame_cv, cv2.COLOR_RGBA2BGR)
             return True, frame_cv
-
-    def create_window(self, name='Window'):
-        """Crea una ventana."""
-        cv2.namedWindow(name, cv2.WINDOW_NORMAL)
-        self.apply_window_mode(name)
 
     def resize_to_screen(self, frame):
         """Redimensiona un frame al tamaño de la pantalla."""

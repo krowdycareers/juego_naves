@@ -95,21 +95,12 @@ ENTITY_ESCAPE_DETECTION_RANGE = 260
 # Y más parámetros...
 ```
 
-## 🔧 Argumentos de Línea de Comandos
+## ▶️ Ejecución
 
 ```bash
-# Usar cámara específica
-python main.py --cam 1
-
-# Usar imagen de fondo personalizada
-python main.py --bg path/to/image.jpg
-
-# Sin selector interactivo de cámara
-make start-no-interactive
-
-# Las mismas opciones también funcionan así
-.venv/bin/python -m src --no-interactive
-messi-start --no-interactive
+python main.py
+.venv/bin/python -m src
+messi-start
 ```
 
 ## 📁 Estructura de Archivos
@@ -208,7 +199,7 @@ glow_color = (120, 180, 255)
 
 | Problema | Solución |
 |----------|----------|
-| Cámara no se detecta | Verifica permisos de sistema, usa `--cam 0`, cierra otras apps |
+| Cámara no se detecta | Verifica permisos de sistema y cierra otras apps que estén usando la webcam |
 | Bajo FPS | Reduce `NUM_ENTITIES`, baja resolución de pantalla |
 | Mano no se detecta | Mejor iluminación, acércate a la cámara, mano visible |
 | Importación fallida | Verifica que estés en el directorio correcto, usa `python main.py` |

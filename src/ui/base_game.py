@@ -1,4 +1,4 @@
-"""Lógica compartida del ciclo principal del juego, independiente del backend UI."""
+"""Lógica compartida del ciclo principal del juego para la app basada en pygame."""
 
 from __future__ import annotations
 
@@ -14,9 +14,9 @@ from ..rendering import OpenCVEntityRenderer, OpenCVWeaponRenderer
 
 
 class BaseGameApp:
-    """Base compartida para backends de ventana como OpenCV y pygame."""
+    """Base de la aplicación de juego con captura/procesamiento desacoplados de la ventana."""
 
-    def __init__(self, camera_index=None, background_path=None, no_interactive=False, weapon=None):
+    def __init__(self, camera_index=None, background_path=None, weapon=None):
         self.camera_manager = CameraManager(
             mode=config.CAMERA_MODE,
             cam_index=camera_index,
@@ -24,24 +24,6 @@ class BaseGameApp:
             max_cam_search=config.CAMERA_MAX_SEARCH,
             fullscreen=config.FULLSCREEN,
         )
-
-        if not no_interactive:
-            print("[DEBUG] Verificando disponibilidad de cámaras para selector...")
-            try:
-                available_cams = self.camera_manager.list_cameras()
-                if available_cams:
-                    print(f"[DEBUG] Encontradas {len(available_cams)} cámaras, mostrando selector...")
-                    selected_cam = self.camera_manager.choose_camera_grid_interactively(
-                        window_name="Selección de Cámara"
-                    )
-                    if selected_cam is not None:
-                        print(f"[DEBUG] Cámara seleccionada: {selected_cam}")
-                    else:
-                        print("[DEBUG] Selección cancelada, usando cámara por defecto")
-                else:
-                    print("[DEBUG] No hay cámaras disponibles, saltando selector")
-            except Exception as exc:
-                print(f"[WARNING] Error en selector de cámaras: {exc}")
 
         self.width = self.camera_manager.width
         self.height = self.camera_manager.height
