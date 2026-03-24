@@ -172,4 +172,24 @@ class Weapon:
     def reproducir_sonido_objetivo(self, tipo):
         """Reproduce un sonido distinto al destruir nave/astronauta."""
         self.sound_player.play_target_hit(tipo)
+
+    def reproducir_sonido_muerte_enemigo(self):
+        """Reproduce el sonido explicito de destruccion de nave enemiga."""
+        self.sound_player.play_enemy_destroyed()
+
+    def reproducir_sonido_impacto_aliado(self):
+        """Reproduce el sonido explicito de impacto sobre aliado."""
+        self.sound_player.play_friendly_hit()
+
+    def reproducir_sonido_colision(self):
+        """Reproduce un sonido de explosion/colision entre entidades."""
+        self.sound_player.play_collision()
+
+    def iniciar_ambiente(self):
+        """Inicia el audio de fondo si el backend lo soporta."""
+        self.sound_player.start_ambience()
+
+    def detener_ambiente(self):
+        """Detiene el audio de fondo si el backend lo soporta."""
+        self.sound_player.stop_ambience()
     

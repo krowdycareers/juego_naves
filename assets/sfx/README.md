@@ -1,0 +1,13 @@
+Coloca aqui tus efectos de sonido reales para que `PygameSoundPlayer` los cargue automaticamente.
+
+Nombres soportados:
+
+- `shot.wav` o variantes `shot_01.wav`, `shot_02.wav`, ...
+- `enemy_explosion.wav` o variantes `enemy_explosion_01.wav`, ...
+- `friendly_hit.wav` o variantes `friendly_hit_01.wav`, ...
+- `collision_explosion.wav` o variantes `collision_explosion_01.wav`, ...
+- `ambience.wav` para el loop de fondo
+
+Tambien se aceptan archivos `.ogg`.
+
+Si no hay archivos, el juego usa sonidos sintetizados como fallback.

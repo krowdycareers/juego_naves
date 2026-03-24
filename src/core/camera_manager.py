@@ -48,12 +48,14 @@ class CameraManager:
         self.screen_index = screen_index
         self.max_cam_search = max_cam_search
         self.fullscreen = fullscreen
+        self.system = platform.system().lower()
         self.backend = self._preferred_backend()
 
         # Información de monitor
         monitors = screeninfo.get_monitors()
         if not monitors:
             raise RuntimeError("No se detectaron monitores")
+        self.monitor_count = len(monitors)
         if screen_index < 0 or screen_index >= len(monitors):
             screen_index = min(max(0, screen_index), len(monitors) - 1)
         self.screen_index = screen_index
@@ -73,19 +75,36 @@ class CameraManager:
 
     def _preferred_backend(self):
         """Retorna el backend preferido de OpenCV según el sistema."""
-        system = platform.system().lower()
-        if system == 'darwin':
+        if self.system == 'darwin':
             return cv2.CAP_AVFOUNDATION
-        if system.startswith('win'):
+        if self.system.startswith('win'):
             return cv2.CAP_DSHOW
         return cv2.CAP_V4L2
 
-    def apply_window_mode(self, name, fullscreen=None):
-        """Aplica fullscreen solo en pantallas secundarias."""
+    def should_use_fullscreen(self, fullscreen=None):
+        """Determina si corresponde usar pantalla completa real."""
         if fullscreen is None:
             fullscreen = self.fullscreen
+        if not fullscreen:
+            return False
 
-        use_fullscreen = fullscreen and self.screen_index > 0
+        # En macOS y en configuraciones de una sola pantalla, fullscreen en la
+        # pantalla principal es un caso valido y esperado.
+        if self.system == 'darwin' or self.monitor_count <= 1:
+            return True
+
+        # Mantiene el comportamiento previo para setups multi-monitor en otros SO.
+        return self.screen_index > 0
+
+    def apply_window_mode(self, name, fullscreen=None):
+        """Aplica el modo de ventana adecuado para el monitor seleccionado."""
+        use_fullscreen = self.should_use_fullscreen(fullscreen)
+
+        # Coloca la ventana en el monitor seleccionado antes de ajustar el modo.
+        try:
+            cv2.moveWindow(name, self.monitor_x, self.monitor_y)
+        except Exception:
+            pass
 
         if use_fullscreen:
             cv2.setWindowProperty(

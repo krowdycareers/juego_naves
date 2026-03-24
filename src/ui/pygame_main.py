@@ -40,7 +40,7 @@ class PygameMain(BaseGameApp):
         self.clock = pygame.time.Clock()
 
     def _resolve_window_flags(self):
-        if config.FULLSCREEN and self.camera_manager.screen_index > 0:
+        if self.camera_manager.should_use_fullscreen(config.FULLSCREEN):
             return pygame.FULLSCREEN
         return 0
 

@@ -7,12 +7,35 @@ import cv2
 import time
 import argparse
 
+from ..audio import PygameSoundPlayer
 from ..core import config
+from ..game.weapon import Weapon
 from .base_game import BaseGameApp
+
+try:
+    import pygame
+except ImportError:
+    pygame = None
 
 
 class GameMain(BaseGameApp):
     """Runner del juego usando OpenCV como backend de ventana."""
+
+    def __init__(self, camera_index=None, background_path=None, no_interactive=False):
+        weapon = None
+        if pygame is not None:
+            try:
+                pygame.init()
+                weapon = Weapon(sound_player=PygameSoundPlayer(pygame_module=pygame))
+            except Exception:
+                weapon = None
+
+        super().__init__(
+            camera_index=camera_index,
+            background_path=background_path,
+            no_interactive=no_interactive,
+            weapon=weapon,
+        )
 
     def _handle_opencv_key(self, key):
         """Procesa una tecla de OpenCV y retorna False si se debe cerrar."""

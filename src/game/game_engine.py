@@ -56,7 +56,7 @@ class GameEngine:
 
                 # Verificar colisión con existentes
                 collision = any(
-                    new_entity.detectar_colision(e) for e in entities
+                    new_entity.detectar_colision(e, alto_total=height) for e in entities
                 )
 
                 if not collision:
@@ -106,12 +106,13 @@ class GameEngine:
 
                 misma_altura = abs(a.y - b.y) <= max(
                     8,
-                    int(min(a.size, b.size) * config.COLLISION_HEIGHT_THRESHOLD)
+                    int((a.radio_colision(alto_total=self.height) + b.radio_colision(alto_total=self.height)) * config.COLLISION_HEIGHT_THRESHOLD)
                 )
                 opuestos = a.tipo != b.tipo
 
                 # Si colisionan y están en la misma altura, explotan
-                if opuestos and misma_altura and a.detectar_colision(b):
+                if opuestos and misma_altura and a.detectar_colision(b, alto_total=self.height):
+                    self.weapon.reproducir_sonido_colision()
                     a.iniciar_explosion(
                         frames_explosion=config.COLLISION_EXPLOSION_FRAMES,
                         iteraciones_reaparicion=random.randint(
@@ -129,7 +130,7 @@ class GameEngine:
                     self.score -= 1
                     continue
 
-                a.rebotar(b)
+                a.rebotar(b, alto_total=self.height)
 
     def make_entities_flee(self, pointer_x, pointer_y):
         """
@@ -183,12 +184,17 @@ class GameEngine:
             if not entity.activo or entity.en_explosion:
                 continue
 
-            if math.hypot(entity.x - shot_x, entity.y - shot_y) <= config.SHOT_TARGET_RADIUS:
-                self.weapon.reproducir_sonido_objetivo(entity.tipo)
-                
+            if entity.contiene_punto_disparo(
+                shot_x,
+                shot_y,
+                alto_total=self.height,
+                padding=config.HITBOX_PADDING + config.WEAPON_RETICLE_HIT_PADDING,
+            ):
                 if entity.tipo == 'malo':
+                    self.weapon.reproducir_sonido_muerte_enemigo()
                     self.score += config.SHOT_SCORE_ENEMY
                 else:
+                    self.weapon.reproducir_sonido_impacto_aliado()
                     self.score -= config.SHOT_SCORE_PENALTY_FRIENDLY
 
                 entity.iniciar_explosion(

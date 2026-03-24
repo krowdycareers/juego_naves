@@ -1,5 +1,5 @@
 """
-SpaceEntity - Representa naves y astronautas en el juego.
+SpaceEntity - Representa naves humanas y alienigenas en el juego.
 Maneja movimiento, colisiones, explosiones y renderizado.
 """
 
@@ -10,11 +10,11 @@ from ..core import config
 
 class SpaceEntity:
     """
-    Entidad espacial: nave o astronauta.
+    Entidad espacial: nave humana o alienigena.
     
     Tipos:
-    - 'malo': Nave enemiga (roja)
-    - 'bueno': Astronauta amigo (azul)
+    - 'malo': Nave extraterrestre enemiga
+    - 'bueno': Nave humana aliada
     """
 
     def __init__(self, x, y, size, vx=0, vy=0, tipo='bueno'):
@@ -70,21 +70,62 @@ class SpaceEntity:
             self.y = alto - self.size
             self.vy *= -1
 
-    def detectar_colision(self, otro):
-        """Detecta colisión real entre círculos usando distancia cuadrada (sin sqrt)."""
+    def detectar_colision(self, otro, alto_total=None):
+        """Detecta colisión con una fase rápida por rect y una fina por círculo."""
         if not self.activo or not otro.activo:
             return False
-        # Optimización: usar distancia cuadrada para evitar sqrt innecesario
+        if not self.rect_colision(alto_total=alto_total).colliderect(otro.rect_colision(alto_total=alto_total)):
+            return False
         dx = self.x - otro.x
         dy = self.y - otro.y
         dist_squared = dx * dx + dy * dy
-        radio_sum = (self.size + otro.size) / 2
+        radio_sum = self.radio_colision(alto_total=alto_total) + otro.radio_colision(alto_total=alto_total)
         radius_squared = radio_sum * radio_sum
         return dist_squared <= radius_squared
 
-    def rebotar(self, otro):
+    def radio_colision(self, alto_total=None, radius_factor=None):
+        """Retorna un radio de colision mas cercano al tamano visible de la nave."""
+        alto_referencia = max(1, int(alto_total if alto_total is not None else self.y + self.size))
+        scale = self.escala_por_altura(
+            alto_referencia,
+            min_scale=config.DEPTH_MIN_SCALE,
+            max_scale=config.DEPTH_MAX_SCALE,
+            steps=config.DEPTH_STEPS,
+        )
+        factor = config.COLLISION_RADIUS_FACTOR if radius_factor is None else radius_factor
+        return max(6.0, (self.size * 0.5) * scale * factor)
+
+    def rect_colision(self, alto_total=None, padding=0):
+        """Retorna un rectangulo visual aproximado para colisiones tipo sprite."""
+        radius = self.radio_colision(alto_total=alto_total)
+        if self.tipo == "malo":
+            half_w = int(radius * 1.35 + padding)
+            half_h = int(radius * 1.05 + padding)
+        else:
+            half_w = int(radius * 1.10 + padding)
+            half_h = int(radius * 1.45 + padding)
+        return Rect(
+            int(self.x - half_w),
+            int(self.y - half_h),
+            max(1, half_w * 2),
+            max(1, half_h * 2),
+        )
+
+    def contiene_punto_disparo(self, px, py, alto_total=None, padding=0):
+        """Evalua si un disparo cae dentro del hitbox visible aproximado del sprite."""
+        rect = self.rect_colision(alto_total=alto_total, padding=padding)
+        if not rect.collidepoint(px, py):
+            return False
+
+        rx = max(1.0, rect.width / 2.0)
+        ry = max(1.0, rect.height / 2.0)
+        nx = (px - self.x) / rx
+        ny = (py - self.y) / ry
+        return (nx * nx) + (ny * ny) <= 1.0
+
+    def rebotar(self, otro, alto_total=None):
         """Cambia la dirección en caso de colisión con otro cuadrado."""
-        if self.detectar_colision(otro):
+        if self.detectar_colision(otro, alto_total=alto_total):
             if abs(self.x - otro.x) > abs(self.y - otro.y):
                 self.vx *= -1  # Rebote en X
             else:
@@ -112,7 +153,7 @@ class SpaceEntity:
 
     def escala_por_altura(self, alto_total, min_scale=0.55, max_scale=1.35, steps=4):
         """
-        Simula "profundidad" usando la altura (y) con escalones marcados:
+        Simula "profundidad" usando la altura (y) de forma suave:
         - arriba (y pequeña) -> más lejos -> más pequeño
         - abajo (y grande) -> más cerca -> más grande
         """
@@ -120,12 +161,51 @@ class SpaceEntity:
         t = float(self.y) / float(h)
         t = max(0.0, min(1.0, t))
 
-        # Cuantizar en 'steps' niveles (por ejemplo 4)
         if steps > 1:
-            band = round(t * (steps - 1))
-            t = band / float(steps - 1)
+            band = t * (steps - 1)
+            lower = math.floor(band)
+            upper = min(steps - 1, lower + 1)
+            mix = band - lower
+            t = ((lower / float(steps - 1)) * (1.0 - mix)) + ((upper / float(steps - 1)) * mix)
 
-        # Suavizar un poco con curva cuadrática (más cambio al final)
-        t = t * t
+        # Curva suave tipo smootherstep para evitar saltos bruscos.
+        t = t * t * (3.0 - 2.0 * t)
 
         return float(min_scale + (max_scale - min_scale) * t)
+
+
+class Rect:
+    """Rectangulo minimo para colisiones estilo sprite sin depender de pygame."""
+
+    def __init__(self, x, y, width, height):
+        self.x = int(x)
+        self.y = int(y)
+        self.width = int(width)
+        self.height = int(height)
+
+    @property
+    def left(self):
+        return self.x
+
+    @property
+    def right(self):
+        return self.x + self.width
+
+    @property
+    def top(self):
+        return self.y
+
+    @property
+    def bottom(self):
+        return self.y + self.height
+
+    def colliderect(self, other):
+        return not (
+            self.right <= other.left
+            or self.left >= other.right
+            or self.bottom <= other.top
+            or self.top >= other.bottom
+        )
+
+    def collidepoint(self, px, py):
+        return self.left <= px <= self.right and self.top <= py <= self.bottom

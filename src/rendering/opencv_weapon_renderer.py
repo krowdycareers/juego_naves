@@ -4,16 +4,129 @@ from __future__ import annotations
 
 import math
 import time
+from pathlib import Path
 
 import cv2
 import numpy as np
+
+from ..core import config
 
 
 class OpenCVWeaponRenderer:
     """Dibuja el arma y sus efectos sobre frames OpenCV."""
 
+    def __init__(self, sprite_dir=None):
+        self.sprite_dir = Path(sprite_dir) if sprite_dir is not None else config.SPRITES_DIR
+        self.weapon_frames = self._load_weapon_frames()
+
     def draw(self, weapon, img, x, y, size=1):
         """Dibuja el arma usando el estado actual del objeto Weapon."""
+        if not self._draw_weapon_sprite(weapon, img, x, y, size):
+            self._draw_fallback_weapon(weapon, img, x, y, size)
+
+        return img
+
+    def _load_weapon_frames(self):
+        frames = []
+        if not self.sprite_dir.exists():
+            return frames
+
+        for name in ("weapon_idle.png", "weapon_fire_1.png", "weapon_fire_2.png"):
+            sprite = self._read_sprite(self.sprite_dir / name)
+            if sprite is not None:
+                frames.append(sprite)
+
+        if not frames:
+            sheet_path = self.sprite_dir / "weapon_sprite_sheet.png"
+            if sheet_path.exists():
+                sheet = self._read_sprite(sheet_path)
+                if sheet is not None:
+                    frame_count = 3
+                    frame_w = sheet.shape[1] // frame_count
+                    for index in range(frame_count):
+                        frame = sheet[:, index * frame_w:(index + 1) * frame_w]
+                        if frame.size > 0:
+                            frames.append(frame)
+
+        return frames
+
+    def _read_sprite(self, path):
+        if not Path(path).exists():
+            return None
+
+        sprite = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
+        if sprite is None:
+            return None
+
+        if sprite.ndim == 2:
+            sprite = cv2.cvtColor(sprite, cv2.COLOR_GRAY2BGRA)
+        elif sprite.shape[2] == 3:
+            alpha = np.full(sprite.shape[:2] + (1,), 255, dtype=np.uint8)
+            sprite = np.concatenate([sprite, alpha], axis=2)
+
+        return sprite
+
+    def _draw_weapon_sprite(self, weapon, img, x, y, size):
+        if not self.weapon_frames:
+            return False
+
+        frame = self._select_frame(weapon)
+        if frame is None:
+            return False
+
+        sprite_scale = config.WEAPON_SPRITE_SCALE * size
+        target_h = max(90, int(frame.shape[0] * sprite_scale))
+        aspect = frame.shape[1] / max(1, frame.shape[0])
+        target_w = max(56, int(target_h * aspect))
+        sprite = cv2.resize(frame, (target_w, target_h), interpolation=cv2.INTER_AREA)
+
+        sight_x = int(target_w * config.WEAPON_SIGHT_ANCHOR_X)
+        sight_y = max(2, int(target_h * config.WEAPON_SIGHT_ANCHOR_Y))
+        x0 = int(x - sight_x)
+        y0 = int(y - sight_y)
+
+        self._blend_sprite(img, sprite, x0, y0)
+        return True
+
+    def _select_frame(self, weapon):
+        if not self.weapon_frames:
+            return None
+
+        if not weapon.debe_mostrar_destello() or len(self.weapon_frames) == 1:
+            return self.weapon_frames[0]
+
+        fire_frames = self.weapon_frames[1:] if len(self.weapon_frames) > 1 else self.weapon_frames
+        if not fire_frames:
+            return self.weapon_frames[0]
+
+        frame_index = int(time.time() * config.WEAPON_FIRE_ANIMATION_FPS) % len(fire_frames)
+        return fire_frames[frame_index]
+
+    def _blend_sprite(self, img, sprite, x, y):
+        sprite_h, sprite_w = sprite.shape[:2]
+        img_h, img_w = img.shape[:2]
+
+        x1 = max(0, x)
+        y1 = max(0, y)
+        x2 = min(img_w, x + sprite_w)
+        y2 = min(img_h, y + sprite_h)
+
+        if x1 >= x2 or y1 >= y2:
+            return
+
+        sx1 = x1 - x
+        sy1 = y1 - y
+        sx2 = sx1 + (x2 - x1)
+        sy2 = sy1 + (y2 - y1)
+
+        sprite_crop = sprite[sy1:sy2, sx1:sx2]
+        rgb = sprite_crop[:, :, :3].astype(np.float32)
+        alpha = sprite_crop[:, :, 3:4].astype(np.float32) / 255.0
+        roi = img[y1:y2, x1:x2].astype(np.float32)
+        img[y1:y2, x1:x2] = (rgb * alpha + roi * (1.0 - alpha)).astype(np.uint8)
+
+    def _draw_fallback_weapon(self, weapon, img, x, y, size):
+        """Mantiene el arma procedural si no existe el sprite real."""
         pistola = np.zeros((100, 85, 3), dtype=np.uint8)
 
         color_negro = (20, 20, 25)
@@ -77,75 +190,26 @@ class OpenCVWeaponRenderer:
 
         sight_x = int(42 * size)
         sight_y = 0
+        self._overlay_bgr(img, pistola, int(x - sight_x), int(y - sight_y))
 
-        h, w = pistola.shape[:2]
+    def _overlay_bgr(self, img, overlay, x, y):
+        h, w = overlay.shape[:2]
         img_h, img_w = img.shape[:2]
 
-        x0 = int(x - sight_x)
-        y0 = int(y - sight_y)
+        x1 = max(0, x)
+        y1 = max(0, y)
+        x2 = min(img_w, x + w)
+        y2 = min(img_h, y + h)
+        if x1 >= x2 or y1 >= y2:
+            return
 
-        if x0 >= img_w or y0 >= img_h or x0 + w <= 0 or y0 + h <= 0:
-            return img
+        ox1 = x1 - x
+        oy1 = y1 - y
+        ox2 = ox1 + (x2 - x1)
+        oy2 = oy1 + (y2 - y1)
 
-        pistola_crop = pistola.copy()
-        if x0 + w > img_w:
-            pistola_crop = pistola_crop[:, :img_w - x0]
-            w = pistola_crop.shape[1]
-        if y0 + h > img_h:
-            pistola_crop = pistola_crop[:img_h - y0, :]
-            h = pistola_crop.shape[0]
-
-        if x0 < 0:
-            pistola_crop = pistola_crop[:, -x0:]
-            w = pistola_crop.shape[1]
-            x0 = 0
-        if y0 < 0:
-            pistola_crop = pistola_crop[-y0:, :]
-            h = pistola_crop.shape[0]
-            y0 = 0
-
-        if h > 0 and w > 0:
-            roi = img[y0:y0+h, x0:x0+w]
-            gray = cv2.cvtColor(pistola_crop, cv2.COLOR_BGR2GRAY)
-            mask = gray > 5
-            roi[mask] = pistola_crop[mask]
-
-        if weapon.debe_mostrar_destello():
-            cv2.circle(img, (x, y), 3, (0, 255, 255), -1)
-            cv2.circle(img, (x, y), 2, (255, 255, 100), -1)
-            cv2.line(img, (x - 8, y), (x + 8, y), (0, 255, 255), 1)
-            cv2.line(img, (x, y - 8), (x, y + 8), (0, 255, 255), 1)
-
-            flash_intensity = (math.sin(time.time() * 30) + 1) / 2
-            flash_intensity = max(0.5, flash_intensity)
-
-            flash_r1 = max(12, int(16 * size * flash_intensity))
-            color1 = (
-                int(0 * flash_intensity),
-                int(165 * flash_intensity),
-                int(255 * flash_intensity),
-            )
-            cv2.circle(img, (x, y), flash_r1, color1, -1)
-
-            flash_r2 = max(6, int(8 * size * flash_intensity))
-            cv2.circle(img, (x, y), flash_r2, (255, 255, 255), -1)
-
-            for i in range(8):
-                ang = (360 / 8) * i + (time.time() * 60 % 360)
-                rad = math.radians(ang)
-                flash_length = max(15, int(22 * size))
-                x2 = int(x + math.cos(rad) * flash_length)
-                y2 = int(y + math.sin(rad) * flash_length)
-
-                ray_color = (
-                    int(0 * flash_intensity),
-                    int(200 * flash_intensity),
-                    int(255 * flash_intensity),
-                )
-                cv2.line(img, (x, y), (x2, y2), ray_color, max(1, int(2 * size)))
-
-            flash_r3 = max(20, int(28 * size * flash_intensity))
-            ring_color = (0, int(100 * flash_intensity), int(200 * flash_intensity))
-            cv2.circle(img, (x, y), flash_r3, ring_color, max(1, int(2 * size)))
-
-        return img
+        crop = overlay[oy1:oy2, ox1:ox2]
+        roi = img[y1:y2, x1:x2]
+        gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+        mask = gray > 5
+        roi[mask] = crop[mask]
